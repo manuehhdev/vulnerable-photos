@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VulnerablePhotos — Account</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="warn-banner">⚠ VulnerablePhotos is an intentionally insecure lab app. Do not deploy. Local use only.</div>
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span> VulnerablePhotos</div>
+  <div id="whoami" style="font-size:13px;color:var(--text-muted)"></div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <a href="index.html">📷 Photos</a>
+    <a href="profile.html" class="active">👤 Account</a>
+    <button class="navlink" id="logout-btn">🚪 Sign out</button>
+  </div>
+
+  <div class="main">
+    <h1>Account settings</h1>
+
+    <div class="section">
+      <h2>Update email</h2>
+      <form id="email-form">
+        <input type="email" id="email-input" placeholder="New email" required>
+        <button type="submit" class="btn">Update email</button>
+      </form>
+      <p style="font-size:12px;color:var(--text-muted)">
+        No confirmation, no CSRF token — try attacker/csrf-delete.html or a forged form.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Avatar from URL</h2>
+      <form id="avatar-form">
+        <input type="text" id="avatar-url" placeholder="https://example.com/pic.jpg" required style="width:100%">
+        <button type="submit" class="btn">Fetch avatar</button>
+      </form>
+      <p style="font-size:12px;color:var(--text-muted)">
+        Server-side fetch, no URL validation — try pointing it at
+        <code>http://127.0.0.1:3000/internal/debug-config</code>.
+      </p>
+      <div id="avatar-output" style="font-size:12px;word-break:break-all"></div>
+    </div>
+
+    <div class="section">
+      <h2>Preferences</h2>
+      <form id="settings-form">
+        <input type="text" id="settings-json" placeholder='{"theme":"dark"}' style="width:100%">
+        <button type="submit" class="btn">Save preferences (raw JSON)</button>
+      </form>
+      <p style="font-size:12px;color:var(--text-muted)">
+        Merged with <code>_.defaultsDeep</code> (lodash 4.17.11, CVE-2019-10744) — try
+        <code>{"constructor":{"prototype":{"isAdmin":true}}}</code>, then hit the admin panel below.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Admin panel</h2>
+      <button class="btn secondary" id="admin-btn">GET /api/admin/users</button>
+      <pre id="admin-output" style="font-size:11px;white-space:pre-wrap"></pre>
+    </div>
+  </div>
+</div>
+
+<script src="js/profile.js"></script>
+</body>
+</html>

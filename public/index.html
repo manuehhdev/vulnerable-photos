@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VulnerablePhotos</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="warn-banner">⚠ VulnerablePhotos is an intentionally insecure lab app. Do not deploy. Local use only.</div>
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span> VulnerablePhotos</div>
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="Search your photos (try: %' UNION SELECT ...)">
+  </div>
+  <div id="whoami" style="font-size:13px;color:var(--text-muted)"></div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <a href="index.html" class="active">📷 Photos</a>
+    <a href="profile.html">👤 Account</a>
+    <button class="navlink" id="lookup-btn">🔎 View user's photos by ID</button>
+    <button class="navlink" id="logout-btn">🚪 Sign out</button>
+  </div>
+
+  <div class="main">
+    <h1 id="page-title">Photos</h1>
+    <div id="search-notice"></div>
+
+    <form id="upload-form" class="upload-form">
+      <input type="file" name="photo" accept="image/*" required>
+      <input type="text" name="title" placeholder="Title" required>
+      <input type="text" name="description" placeholder="Description">
+      <button type="submit" class="btn">Upload</button>
+    </form>
+
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<div class="lightbox-overlay" id="lightbox">
+  <button class="close-btn" id="lightbox-close">&times;</button>
+  <img id="lightbox-img" src="" alt="">
+  <div class="meta" id="lightbox-meta"></div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

