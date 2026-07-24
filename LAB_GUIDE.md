@@ -57,6 +57,11 @@ This dumps every username/password pair into the photo search results because
 ```html
  <img src=x onerror="alert(/stored-xss/.source+document.cookie)">
 ```
+> Note: use backticks (or no string literal at all) inside the payload, not
+> single quotes. `/api/photos` builds its `INSERT` by concatenating the title
+> into a `'...'` SQL literal (the 2.1 SQLi flaw), so a `'` in the payload closes
+> the string early and the upload fails with a SQLite syntax error before
+> anything is stored.
 Every user who views the gallery (or the same user reloading it) now executes
 your script — the title is inserted via `innerHTML` in `public/js/app.js`
 (`renderGrid`) with no escaping. Because the session cookie is *not*
@@ -68,7 +73,9 @@ your script — the title is inserted via `innerHTML` in `public/js/app.js`
 <img src=x onerror="alert(/reflected-xss/.source)">
 ```
 The raw query term is echoed back into `#search-notice` unescaped
-(`public/js/app.js`, `runSearch`).
+(`public/js/app.js`, `runSearch`). Same caveat as the stored payload: avoid
+single quotes — `/api/search` concatenates `q` into a `LIKE '%...%'` literal,
+so a `'` triggers a SQLite syntax error (HTTP 500) instead of reflecting.
 
 ### 2.3 Broken Access Control (IDOR)
 
