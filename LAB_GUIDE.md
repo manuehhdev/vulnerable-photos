@@ -1,6 +1,6 @@
 # LAB_GUIDE.md — VulnerablePhotos Workshop
 
-> Run everything against `http://127.0.0.1:3000` only. Do not expose this app
+> Run everything against `http://127.0.0.1:4567` only. Do not expose this app
 > to any network. Use only the seed accounts and fake data provided.
 
 ## 1. Setup
@@ -13,7 +13,7 @@ npm run seed            # (re)creates db/gallery.db with seed users + photos
 npm start
 ```
 
-Open `http://127.0.0.1:3000` — you'll land on `login.html`. Seed accounts:
+Open `http://127.0.0.1:4567` — you'll land on `login.html`. Seed accounts:
 
 | username | password | role  |
 |----------|----------|-------|
@@ -78,7 +78,7 @@ your session belongs to bob — `GET /api/users/:id/photos` only checks that
 *a* session exists, never that it matches `:id`.
 
 ```bash
-curl -b cookies.txt http://127.0.0.1:3000/api/users/1/photos
+curl -b cookies.txt http://127.0.0.1:4567/api/users/1/photos
 ```
 
 Sequential integer IDs make this trivial to script: loop `id = 1..N` and dump
@@ -94,7 +94,7 @@ treats it as cross-site):
 cd attacker
 python3 -m http.server 4000
 # visit http://127.0.0.1:4000/csrf-delete.html while logged into
-# http://127.0.0.1:3000 in the same browser
+# http://127.0.0.1:4567 in the same browser
 ```
 
 Loading that page silently:
@@ -112,20 +112,20 @@ Serve the attacker page the same way:
 cd attacker
 python3 -m http.server 4000
 # visit http://127.0.0.1:4000/cors-steal.html while logged into
-# http://127.0.0.1:3000
+# http://127.0.0.1:4567
 ```
 
 Click **"Steal victim's data"**. Because the server reflects the `Origin`
 header into `Access-Control-Allow-Origin` and sets
 `Access-Control-Allow-Credentials: true`, `fetch(..., { credentials: 'include' })`
-from `127.0.0.1:4000` can read authenticated JSON from `127.0.0.1:3000` —
+from `127.0.0.1:4000` can read authenticated JSON from `127.0.0.1:4567` —
 including, chained with the IDOR above, every user's photo list.
 
 ### 2.6 SSRF (bonus)
 
 Log in, go to **Account → Avatar from URL**, and submit:
 ```
-http://127.0.0.1:3000/internal/debug-config
+http://127.0.0.1:4567/internal/debug-config
 ```
 The server fetches that URL itself (`axios.get(url)`, no allowlist, no
 scheme/host restriction) and you can read the response back — a stand-in for
@@ -209,7 +209,7 @@ Suggested acceptance criteria per fix:
    `/api/account/avatar-from-url` (block loopback/private ranges, restrict to
    `http(s)`, consider an allowlist of domains or disabling server-side URL
    fetch entirely in favor of client-side upload).
-   *Acceptance:* `http://127.0.0.1:3000/internal/debug-config` and
+   *Acceptance:* `http://127.0.0.1:4567/internal/debug-config` and
    `http://169.254.169.254/...`-style targets are rejected.
 
 7. **Prototype Pollution** — Stop merging untrusted `req.body` directly with
