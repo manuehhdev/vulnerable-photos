@@ -13,19 +13,30 @@ async function init() {
 
 function renderGrid(photos) {
   const grid = document.getElementById('grid');
-  // VULN: stored XSS — title/description are inserted with innerHTML, no escaping.
-  grid.innerHTML = photos
-    .map(
-      (p) => `
-    <div class="tile" data-id="${p.id}" data-owner="${p.owner_id}">
-      <img src="/uploads/${p.filename}" alt="">
-      <div class="owner-badge">user #${p.owner_id}</div>
-      <button class="delete-btn" onclick="deletePhoto(event, ${p.id})">&times;</button>
-      <div class="caption">${p.title}</div>
-    </div>
-  `
-    )
-    .join('');
+  grid.innerHTML = ''; 
+
+  photos.forEach(p => {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.dataset.id = p.id;
+    tile.dataset.owner = p.owner_id;
+
+    const img = document.createElement('img');
+    img.src = `/uploads/${p.filename}`;
+
+    const caption = document.createElement('div');
+    caption.className = 'caption';
+    caption.textContent = p.title; 
+
+    const badge = document.createElement('div');
+    badge.className = 'owner-badge';
+    badge.textContent = `user #${p.owner_id}`;
+
+    tile.appendChild(img);
+    tile.appendChild(badge);
+    tile.appendChild(caption);
+    grid.appendChild(tile);
+  });
 
   [...grid.querySelectorAll('.tile')].forEach((tile, i) => {
     tile.addEventListener('click', (e) => {
@@ -81,7 +92,11 @@ async function runSearch(q) {
   const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
   const data = await res.json();
   // VULN: reflected XSS — data.term is the raw query string, rendered unescaped.
-  notice.innerHTML = `<div class="notice info">Results for: ${data.term}</div>`;
+  //notice.innerHTML = `<div class="notice info">Results for: ${data.term}</div>`;
+  divNotice = document.createElement('div');
+  divNotice.className = 'notice info';
+  divNotice.textContent = `Results for: ${data.term}`;
+  notice.appendChild(divNotice);
   document.getElementById('page-title').textContent = 'Search';
   renderGrid(data.results || []);
 }
@@ -95,13 +110,30 @@ async function deletePhoto(e, id) {
 
 function openLightbox(photo) {
   document.getElementById('lightbox-img').src = `/uploads/${photo.filename}`;
-  // VULN: stored XSS in the lightbox description too.
-  document.getElementById('lightbox-meta').innerHTML = `
-    <h2>${photo.title}</h2>
-    <p>${photo.description || ''}</p>
-    <button class="btn secondary" onclick="shareLink(${photo.id})">Get share link</button>
-    <div id="share-output" style="margin-top:8px;font-size:12px;word-break:break-all"></div>
-  `;
+
+  const meta = document.getElementById('lightbox-meta');
+  meta.innerHTML = ''; // safe - no user data here
+
+  const titleEl = document.createElement('h2');
+  titleEl.textContent = photo.title;
+
+  const descEl = document.createElement('p');
+  descEl.textContent = photo.description || '';
+
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'btn secondary';
+  shareBtn.textContent = 'Get share link';
+  shareBtn.addEventListener('click', () => shareLink(photo.id));
+
+  const shareOutput = document.createElement('div');
+  shareOutput.id = 'share-output';
+  shareOutput.style.cssText = 'margin-top:8px;font-size:12px;word-break:break-all';
+
+  meta.appendChild(titleEl);
+  meta.appendChild(descEl);
+  meta.appendChild(shareBtn);
+  meta.appendChild(shareOutput);
+
   document.getElementById('lightbox').classList.add('open');
 }
 

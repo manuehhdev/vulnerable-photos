@@ -11,7 +11,13 @@ document.getElementById('show-register').addEventListener('click', (e) => {
 function showNotice(msg, type) {
   // VULN: reflected XSS — server error messages (which can include raw SQL /
   // user input) are rendered with innerHTML, unescaped.
-  noticeEl.innerHTML = `<div class="notice ${type}">${msg}</div>`;
+  const divNotice = document.createElement('div');
+  divNotice.className = `notice ${type}`;
+  divNotice.textContent = msg;
+  noticeEl.innerHTML = '';
+  noticeEl.appendChild(divNotice);
+  //
+  //noticeEl.innerHTML = `<div class="notice ${type}">${msg}</div>`;
 }
 
 loginForm.addEventListener('submit', async (e) => {

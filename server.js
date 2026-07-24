@@ -2,6 +2,7 @@
  * VulnerablePhotos — INTENTIONALLY INSECURE. Educational use only. Do not deploy.
  * See LAB_GUIDE.md and KNOWN_VULNERABILITIES.md for the full vulnerability catalogue.
  */
+require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
@@ -13,11 +14,11 @@ const axios = require('axios');
 const db = require('./lib/db');
 
 const app = express();
-const PORT = 3000;
+const PORT = 4567;
 
 // VULN: hardcoded, short, guessable JWT secret (CWE-798) — also lives in this
 // public source file, so anyone who forks the repo can forge share tokens.
-const JWT_SECRET = 'vp2024';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const upload = multer({ dest: path.join(__dirname, 'uploads') });
 
@@ -28,14 +29,21 @@ app.use(express.urlencoded({ extended: true }));
 // VULN: Misconfigured CORS — reflects any Origin and allows credentials.
 // This lets ANY third-party site read authenticated API responses cross-site.
 // -----------------------------------------------------------------------
+const ALLOWED_ORIGINS = [
+  'http://127.0.0.1:4567',
+  'http://localhost:4567',
+];
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin); // reflection, not an allowlist
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   }
+  // Si el origin no está permitido, no se envían cabeceras CORS
+  // y el browser bloquea la respuesta cross-origin.
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -46,10 +54,10 @@ app.use((req, res, next) => {
 // -----------------------------------------------------------------------
 app.use(
   session({
-    secret: 'super-secret-keyboard-cat',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: false }, // httpOnly:false on purpose so XSS demos can read document.cookie
+    cookie: { httpOnly: true, sameSite: 'strict' },
   })
 );
 
@@ -67,9 +75,9 @@ function requireLogin(req, res, next) {
 // =========================================================================
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
+  const query = `SELECT * FROM users WHERE username = ? AND password = ?`;
   // Try: username = admin' -- , password = anything  ->  auth bypass
-  db.get(query, (err, row) => {
+  db.get(query, [username, password], (err, row) => {
     if (err) return res.status(500).json({ error: err.message, query });
     if (!row) return res.status(401).json({ error: 'invalid credentials' });
     req.session.user = { id: row.id, username: row.username, is_admin: !!row.is_admin };
@@ -80,8 +88,8 @@ app.post('/api/login', (req, res) => {
 app.post('/api/register', (req, res) => {
   const { username, password, email } = req.body;
   if (!username || !password || !email) return res.status(400).json({ error: 'missing fields' });
-  const query = `INSERT INTO users (username, password, email) VALUES ('${username}', '${password}', '${email}')`;
-  db.run(query, function (err) {
+  const query = `INSERT INTO users (username, password, email) VALUES (?, ?, ?)`;
+  db.run(query, [username, password, email], function (err) {
     if (err) return res.status(400).json({ error: err.message });
     req.session.user = { id: this.lastID, username, is_admin: false };
     res.json({ ok: true, user: req.session.user });
@@ -99,8 +107,8 @@ app.get('/api/whoami', (req, res) => {
 // SQLi #2: search, string-concatenated LIKE + UNION-friendly surface.
 app.get('/api/search', requireLogin, (req, res) => {
   const q = req.query.q || '';
-  const query = `SELECT id, owner_id, title, description, filename FROM photos WHERE title LIKE '%${q}%' OR description LIKE '%${q}%'`;
-  db.all(query, (err, rows) => {
+  const query = `SELECT id, owner_id, title, description, filename FROM photos WHERE title LIKE ? OR description LIKE ?`;
+  db.all(query, [`%${q}%`, `%${q}%`], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message, query });
     // VULN: reflected XSS — the raw query term is echoed back verbatim for the
     // frontend to render with innerHTML (see public/js/app.js).
@@ -115,8 +123,9 @@ app.get('/api/search', requireLogin, (req, res) => {
 app.post('/api/photos', requireLogin, upload.single('photo'), (req, res) => {
   const { title, description } = req.body;
   if (!req.file) return res.status(400).json({ error: 'no file uploaded' });
-  const query = `INSERT INTO photos (owner_id, title, description, filename) VALUES (${req.session.user.id}, '${title}', '${description}', '${req.file.filename}')`;
-  db.run(query, function (err) {
+ 
+  const query = `INSERT INTO photos (owner_id, title, description, filename) VALUES (?, ?, ?, ?)`;
+  db.run(query, [req.session.user.id, title, description, req.file.filename], function (err) {
     if (err) return res.status(400).json({ error: err.message, query });
     res.json({ ok: true, id: this.lastID });
   });
@@ -136,6 +145,11 @@ app.get('/api/photos', requireLogin, (req, res) => {
 // =========================================================================
 app.get('/api/users/:id/photos', requireLogin, (req, res) => {
   const userId = req.params.id; // no check that req.session.user.id === userId
+  
+  if (req.session.user.id !== parseInt(userId)) {
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
   db.all('SELECT id, owner_id, title, description, filename FROM photos WHERE owner_id = ?', [userId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
@@ -146,6 +160,8 @@ app.get('/api/photos/:id', requireLogin, (req, res) => {
   db.get('SELECT id, owner_id, title, description, filename FROM photos WHERE id = ?', [req.params.id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'not found' });
+    if (row.owner_id !== req.session.user.id)
+      return res.status(403).json({ error: 'forbidden' });
     res.json(row); // no ownership check
   });
 });
@@ -162,14 +178,31 @@ app.post('/api/photos/:id/delete', requireLogin, (req, res) => {
   });
 });
 
-app.get('/api/photos/:id/delete', requireLogin, (req, res) => {
-  db.run('DELETE FROM photos WHERE id = ?', [req.params.id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ ok: true });
-  });
-});
+// app.get('/api/photos/:id/delete', requireLogin, (req, res) => {
+
+//    const origin = req.headers.origin;
+//   const expectedOrigin = 'http://127.0.0.1:4567';
+
+//   if (origin !== expectedOrigin) {
+//     return res.status(403).json({ error: 'Forbidden' });
+//   }
+
+
+//   db.run('DELETE FROM photos WHERE id = ?', [req.params.id], (err) => {
+//     if (err) return res.status(500).json({ error: err.message });
+//     res.json({ ok: true });
+//   });
+// });
 
 app.post('/api/account/email', requireLogin, (req, res) => {
+
+  const origin = req.headers.origin;
+  const expectedOrigin = 'http://127.0.0.1:4567';
+
+  if (origin !== expectedOrigin) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const { email } = req.body;
   db.run('UPDATE users SET email = ? WHERE id = ?', [email, req.session.user.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -183,7 +216,11 @@ app.post('/api/account/email', requireLogin, (req, res) => {
 // used by requireAdmin() below for every plain object app-wide.
 // =========================================================================
 app.post('/api/settings', requireLogin, (req, res) => {
-  const prefs = _.defaultsDeep({}, req.body, { theme: 'light', tileSize: 'medium' });
+  const defaults = { theme: 'light', tileSize: 'medium' };
+  const prefs = {};
+  for (const key of ['theme', 'tileSize']) {
+    prefs[key] = req.body[key] !== undefined ? req.body[key] : defaults[key];
+  }
   req.session.prefs = prefs;
   res.json({ ok: true, prefs });
 });
@@ -208,6 +245,14 @@ app.get('/api/admin/users', requireLogin, requireAdmin, (req, res) => {
 app.post('/api/account/avatar-from-url', requireLogin, async (req, res) => {
   const { url } = req.body;
   try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol))
+      return res.status(400).json({ error: 'http/https only' });
+
+    const blocked = ['127.0.0.1', 'localhost', '169.254.169.254', '0.0.0.0', '::1', '[::1]'];
+    if (blocked.includes(parsed.hostname))
+      return res.status(400).json({ error: 'URL points to a blocked host' });
+
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     const destName = `${Date.now()}-avatar-fetch`;
     fs.writeFileSync(path.join(__dirname, 'uploads', destName), response.data);
@@ -242,7 +287,7 @@ app.post('/api/photos/:id/share', requireLogin, (req, res) => {
 });
 
 app.get('/shared/:token', (req, res) => {
-  jwt.verify(req.params.token, JWT_SECRET, (err, payload) => {
+  jwt.verify(req.params.token, JWT_SECRET, { algorithms: ['HS256'] }, (err, payload) => {
     if (err) return res.status(401).json({ error: 'invalid or expired token' });
     db.get('SELECT id, title, description, filename FROM photos WHERE id = ?', [payload.photoId], (err2, row) => {
       if (err2 || !row) return res.status(404).json({ error: 'not found' });

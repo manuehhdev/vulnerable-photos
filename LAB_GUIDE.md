@@ -55,7 +55,7 @@ This dumps every username/password pair into the photo search results because
 
 **Stored:** Log in, upload a photo with title:
 ```html
-<img src=x onerror="alert('stored-xss:'+document.cookie)">
+ <img src=x onerror="alert(/stored-xss/.source+document.cookie)">
 ```
 Every user who views the gallery (or the same user reloading it) now executes
 your script — the title is inserted via `innerHTML` in `public/js/app.js`
@@ -65,7 +65,7 @@ your script — the title is inserted via `innerHTML` in `public/js/app.js`
 
 **Reflected:** Search for:
 ```html
-<img src=x onerror=alert('reflected-xss')>
+<img src=x onerror="alert(/reflected-xss/.source)">
 ```
 The raw query term is echoed back into `#search-notice` unescaped
 (`public/js/app.js`, `runSearch`).

